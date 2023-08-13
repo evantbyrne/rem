@@ -74,8 +74,8 @@ import (
 
 ```go
 // Choose one:
-rem.SetDialect(&mysqldialect.Dialect{})
-rem.SetDialect(&pqdialect.Dialect{})
+rem.SetDialect(mysqldialect.Dialect{})
+rem.SetDialect(pqdialect.Dialect{})
 
 // Then connect to your database as usual.
 db, err := sql.Open("<driver>", "<connection string>")
@@ -165,16 +165,14 @@ logs, err := rem.MigrateUp(db, []rem.Migration{
 	Migration0001Accounts{},
 	// More migrations...
 })
-for _, log := range logs {
-	// e.g., "Migrating up to Migration0001Accounts..."
-	fmt.Println(log)
-}
+// logs []string
+// For example: {"Migrating up to Migration0001Accounts..."}
 ```
 
 REM will create a `migrationlogs` table to track which migrations have been run. Execution of subsequent migrations will stop if an error is returned. Use `rem.MigrateDown(*sql.DB, []rem.Migration)` to run migrations in reverse.
 
 
-## Queries
+## Reference
 
 ### All
 
@@ -216,6 +214,15 @@ The `Delete` convenience method deletes matching records.
 ```go
 results, err := rem.Use[Accounts]().Filter("id", "=", 100).Delete(db)
 // results sql.Result
+```
+
+
+### Dialect
+
+Set the dialect for a specific query. This takes priority over the default dialect.
+
+```go
+rem.Use[Accounts]().Dialect(mysqldialect.Dialect{}).All(db)
 ```
 
 
@@ -340,7 +347,7 @@ results, err := rem.Use[Accounts]().Insert(db, account)
 // results sql.Result
 ```
 
-REM also provides a `UpdateMap` convenience method that updates mathcing records with all columns provided by a `map[string]interface{}`.
+REM also provides a `UpdateMap` convenience method that updates matching records with all columns provided by a `map[string]interface{}`.
 
 **Note:** Zero-valued primary keys **will** be included when provided to inserts via the `InsertMap` method.
 
@@ -350,6 +357,43 @@ account := map[string]interface{}{
 }
 
 results, err := rem.Use[Accounts]().InsertMap(db, account)
+```
+
+
+### Join
+
+The `Join`, `JoinFull`, `JoinLeft`, and `JoinRight` methods are for performing their respective types of SQL joins.
+
+The first argument is the table to join.
+
+The second argument takes any number of filters to join on.
+
+```go
+rows, err := rem.Use[Accounts]().
+	Select("accounts.id", "accounts.name", rem.As("groups.name", "group_name")).
+	Join("groups", rem.Q("groups.id", "=", rem.Column("accounts.group_id"))).
+	AllToMap(db)
+
+// Use a custom model.
+type AccountsWithGroupName struct {
+    GroupName string `db:"group_name"`
+	Id        string `db:"id" primary_key:"true"`
+	Name      string `db:"name"`
+}
+
+rows, err := rem.Use[AccountsWithGroupName](rem.Config{Table: "accounts"}).
+	Select(rem.As("accounts.id", "id"), rem.As("accounts.name", "name"), rem.As("groups.name", "group_name")).
+	Join("groups", rem.Q("groups.id", "=", rem.Column("accounts.group_id"))).
+	All(db)
+
+// Use Query() to join without selecting columns.
+rows, err := rem.Use[Accounts]().
+	Query().
+	JoinFull("groups", rem.Or(
+		rem.Q("groups.id", "IS", nil),
+		rem.Q("groups.id", "=", rem.Column("accounts.group_id")),
+	).
+	AllToMap(db)
 ```
 
 
@@ -363,6 +407,21 @@ rem.Use[Accounts]().Limit(10).All(db)
 
 // LIMIT 10 OFFSET 20
 rem.Use[Accounts]().Limit(10).Offset(20).All(db)
+```
+
+
+### Scan Map
+
+The `ScanMap` convenience method converts a `map[string]interface{}` into a model pointer.
+
+```go
+data := map[string]interface{}{
+	"id":   100,
+	"name": "New Name",
+}
+
+account, err := rem.Use[Accounts].ScanMap(data)
+// account *Accounts
 ```
 
 
@@ -392,6 +451,92 @@ rem.Use[Accounts]().Sort("-name").All(db)
 
 // ORDER BY name ASC, id DESC
 rem.Use[Accounts]().Sort("name", "-id").All(db)
+```
+
+
+### SQL All
+
+Executes a raw SQL query with parameters and returns a list of records.
+
+```go
+accounts, err := rem.Use[Accounts]().SqlAll(db, "select * from accounts where id >= ?", 100)
+// accounts []*Accounts
+
+accounts, err := rem.Use[Accounts]().SqlAllToMap(db, "select * from accounts where id >= ?", 100)
+// accounts []map[string]interface{}
+```
+
+
+### Table Column Add
+
+The `TableColumnAdd` method adds a column to a table. A field must exist in the model struct for the column to be added.
+
+```go
+type Accounts struct {
+    Id      int64  `db:"id" primary_key:"true"`
+    Name    string `db:"name"`
+    IsAdmin bool   `db:"is_admin"`
+}
+
+_, err := rem.Use[Accounts]().TableColumnAdd(db, "is_admin")
+```
+
+
+### Table Column Drop
+
+The `TableColumnDrop` method drops a column to a table.
+
+```go
+_, err := rem.Use[Accounts]().TableColumnDrop(db, "is_admin")
+```
+
+
+### Table Create
+
+The `TableCreate` method creates a table for the model.
+
+```go
+_, err := rem.Use[Accounts]().TableCreate(db)
+
+// Override the table name.
+_, err := rem.Use[Accounts](rem.Config{Table: "users"}).TableCreate(db)
+
+// Only create the table if it doesn't exist.
+_, err := rem.Use[Accounts]().TableCreate(db, rem.TableCreateConfig{IfNotExists: true})
+```
+
+
+### Table Drop
+
+The `TableDrop` method drops a table for the model.
+
+```go
+_, err := rem.Use[Accounts]().TableDrop(db)
+
+// Override the table name.
+_, err := rem.Use[Accounts](rem.Config{Table: "users"}).TableDrop(db)
+
+// Only drop the table if it exists.
+_, err := rem.Use[Accounts]().TableDrop(db, rem.TableDropConfig{IfExists: true})
+```
+
+
+### To Map
+
+The `ToMap` convenience method converts a model pointer into a `map[string]interface{}`. Keys on the returned map are column names.
+
+**Note:** Zero-valued primary keys are excluded from the returned map.
+
+**Note:** Fields that implement the `driver.Valuer` interface are converted to their `Value()` representation. For example, a `sql.NullString` will be converted to either `string` or `nil`.
+
+```go
+account := &Accounts{
+    Id:   100,
+    Name: "New Name",
+}
+
+data := rem.Use[Accounts]().ToMap(account)
+// data map[string]interface{}
 ```
 
 
@@ -443,7 +588,7 @@ results, err := rem.Use[Accounts]().
 // results sql.Result
 ```
 
-REM also provides a `UpdateMap` convenience method that updates mathcing records with all columns provided by a `map[string]interface{}`.
+REM also provides a `UpdateMap` convenience method that updates matching records with all columns provided by a `map[string]interface{}`.
 
 ```go
 account := map[string]interface{}{
