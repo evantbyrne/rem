@@ -1,6 +1,6 @@
 # REM
 
-The next generation Golang ORM. The name REM stands for Relational Entity Mapper.
+The retro Golang ORM. **R**etro **E**ntity **M**apper.
 
 ```go
 type Accounts struct {
