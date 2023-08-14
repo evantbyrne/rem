@@ -58,6 +58,11 @@ go get github.com/evantbyrne/rem
 **Note:** REM is not yet stable and pre-1.0 releases may result in breaking changes.
 
 
+## Contributing
+
+Please post feature requests, questions, and other feedback to the [discussions board](https://github.com/evantbyrne/rem/discussions). Submit bug reports to the [issue tracker](https://github.com/evantbyrne/rem/issues).
+
+
 ## Dialects
 
 REM supports PostgreSQL and MySQL. SQLite support is planned. To use a dialect, import the appropriate package and set it as the default once on application bootup.
@@ -172,6 +177,156 @@ logs, err := rem.MigrateUp(db, []rem.Migration{
 REM will create a `migrationlogs` table to track which migrations have been run. Execution of subsequent migrations will stop if an error is returned. Use `rem.MigrateDown(*sql.DB, []rem.Migration)` to run migrations in reverse.
 
 
+## Fields
+
+### Field Types
+
+REM determines column types based on Go field types. The following table shows the default column types for each Go primative.
+
+**Note:** REM uses special Go types for nullable columns. Don't use pointers for model fields.
+
+Go | MySQL | PostgreSQL
+--- | --- | ---
+`bool` | `BOOLEAN` | `BOOLEAN`
+`[]byte` | - | -
+`int8` | `TINYINT` | `SMALLINT`
+`int16` | `SMALLINT` | `SMALLINT`
+`int32` | `INTEGER` | `INTEGER`
+`int64` | `BIGINT` | `BIGINT`
+`float32` | `FLOAT` | -
+`float64` | `DOUBLE` | `DOUBLE PRECISION`
+`string` | `VARCHAR`,`TEXT`\[1\] | `VARCHAR`,`TEXT`\[1\]
+`time.Time` | `DATETIME`\[2\] | `TIMESTAMP`\[3\]
+
+\[1\] The `VARCHAR` column type is used for `string` and `sql.NullString` fields when the `db_max_length` field tag is provided. Otherwise, `TEXT` is used.
+
+\[2\] Go's most popular MySQL driver requires adding the `parseTime=true` GET parameter to the connection string to properly scan into `time.Time` and `sql.NullTime` fields.
+
+\[3\] The PostgreSQL dialect defaults to `WITHOUT TIME ZONE` for time types. Add the `db_time_zone:"true"` field tag to use `WITH TIME ZONE` instead.
+
+Columns are not nullable by default. REM uses the standard `database/sql` package types to represent nullable columns.
+
+Not Null | Nullable
+--- | ---
+`bool` | `sql.NullBool`
+`float64` | `sql.NullFloat64`
+`int16` | `sql.NullInt16`
+`int32` | `sql.NullInt32`
+`int64` | `sql.NullInt64`
+`rem.ForeignKey[To]` | `rem.NullForeignKey[To]`
+`string` | `sql.NullString`
+`time.Time` | `sql.NullTime`
+
+Primary keys are specified with the `primary_key:"true"` field tag. All models must have a primary key. Integer fields that are primary keys will auto-increment.
+
+```go
+// An auto-incrementing primary key.
+type A struct {
+	Id int64  `db:"id" primary_key:"true"`
+}
+
+// VARCHAR primary key with no default value.
+type B struct {
+	Guid string `db:"guid" db_max_length:"36" primary_key:"true"`
+}
+```
+
+### Default
+
+The `db_default` field tag applies a default value to columns. It accepts any string.
+
+**Note:** Values provided to `db_default` are not escaped or otherwise sanitized.
+
+```go
+// This timestamp uses the SQL function now() for its default value.
+type Logs struct {
+	CreatedAt time.Time `db:"created_at" db_default:"now()"`
+	// ...
+}
+```
+
+### Unique
+
+The `db_unique:"true"` field tag applies a unique constraint to a column.
+
+```go
+type Accounts struct {
+	Nickname string `db:"created_at" db_unique:"true"`
+	// ...
+}
+```
+
+### Custom Types
+
+Custom column types can be set using the `db_type` field tag, which accpets any string value.
+
+**Note:** Values provided to `db_type` are not escaped or otherwise sanitized.
+
+```go
+// An example of using PostgreSQL's JSONB type.
+type A struct {
+	Id   int64  `db:"id" primary_key:"true"`
+	Data []byte `db:"data" db_type:"JSONB NOT NULL"`
+}
+
+// db_type takes priority over all other field tags, including primary key typing.
+type B struct {
+	Guid string `db:"guid" db_type:"CHAR(36) NOT NULL" primary_key:"true"`
+}
+```
+
+Custom Go types may also be used for model fields, but they must implement the `driver.Valuer` and `sql.Scanner` interfaces in additon to being supported by your database driver.
+
+### Foreign Keys
+
+Foreign keys are specified with the `rem.ForeignKey[To]` and `rem.NullForeignKey[To]` field types. REM automatically matches the foreign key column type to the primary key of the target model.
+
+On the other end of the relation, use `rem.OneToMany[To]`.
+
+```go
+type Groups struct {
+	Members rem.OneToMany[Members] `related_column:"group_id"`
+	Id      int64                  `db:"id" primary_key:"true"`
+}
+
+type Members struct {
+	Group rem.ForeignKey[Groups] `db:"group_id"`
+	Id    int64                  `db:"id" primary_key:"true"`
+}
+```
+
+See [Fetch Related](#fetch-related) for information on querying relationships effeciently.
+
+Relations may also be queried lazily.
+
+```go
+// Lazily fetch from a one-to-many field.
+group, err := rem.Use[Groups]().Filter("id", "=", 100).First(db)
+if err != nil {
+	panic(err)
+}
+accounts, err := group.Members.All(db)
+// accounts []*Accounts
+
+// Lazily fetch from a foreign key field.
+account, err := rem.Use[Accounts]().Filter("id", "=", 200).First(db)
+if err != nil {
+	panic(err)
+}
+group, err := account.Group.Fetch(db)
+// group *Groups
+```
+
+Foreign key `ON DELETE` and `ON UPDATE` constraints, such as `CASCADE` or `SET NULL`, may be set with the `db_on_delete` and `db_on_update` field tags.
+
+```go
+type Members struct {
+	Group rem.NullForeignKey[Groups] `db:"group_id" db_on_delete:"SET NULL" db_on_update:"SET NULL"`
+	// ...
+}
+```
+
+
 ## Reference
 
 ### All
@@ -235,30 +390,30 @@ Regardless of which side of the relationship you start from or how many records 
 ```go
 // Model definitions for Groups <->> Accounts relationship.
 type Accounts struct {
-    Group rem.ForeignKey[Groups] `db:"group_id"`
-    Id    int64                  `db:"id" primary_key:"true"`
-    Name  string                 `db:"name" db_max_length:"100"`
+	Group rem.ForeignKey[Groups] `db:"group_id"`
+	Id    int64                  `db:"id" primary_key:"true"`
+	Name  string                 `db:"name" db_max_length:"100"`
 }
 
 type Groups struct {
-    Accounts rem.OneToMany[Accounts] `related_column:"group_id"`
-    Id       int64                   `db:"id" primary_key:"true"`
-    Name     string                  `db:"name" db_max_length:"100"`
+	Accounts rem.OneToMany[Accounts] `related_column:"group_id"`
+	Id       int64                   `db:"id" primary_key:"true"`
+	Name     string                  `db:"name" db_max_length:"100"`
 }
 ```
 
 ```go
 groups, err := rem.Use[Groups]().FetchRelated("Accounts").All(db)
 for _, group := range groups {
-    // group *Groups
-    // group.Accounts.Rows []*Accounts
+	// group *Groups
+	// group.Accounts.Rows []*Accounts
 }
 
 accounts, err := rem.Use[Accounts]().FetchRelated("Group").All(db)
 for _, account := range accounts {
-    // account *Accounts
-    // account.Group.Row *Groups
-    // account.Group.Valid bool
+	// account *Accounts
+	// account.Group.Row *Groups
+	// account.Group.Valid bool
 }
 ```
 
