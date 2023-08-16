@@ -469,6 +469,55 @@ rem.Use[Accounts]().
 	All(db)
 ```
 
+#### Custom SQL
+
+Safely parameterized SQL may be embedded via the `rem.Sql()` and `rem.Param()` functions. String arguments to `rem.Sql()` are not escaped or otherwise sanitized. `rem.Param()` arguments are parameterized by the database driver.
+
+```go
+// SQL: SELECT * FROM logs WHERE data.tags ?| array[$1]
+// Parameters: []interface{}{"foo"}
+rem.Use[Logs]().
+	Filter("data.tags", "?|", rem.Sql("array[", rem.Param("foo"), "]")).
+	All(db)
+```
+
+Raw SQL may also be embedded into either the left or right side of a filters via the `rem.Unsafe()` function.
+
+**Note:** Values provided to `rem.Unsafe()` are not escaped or otherwise sanitized. Only use this function with trusted values.
+
+```go
+// SQL: SELECT * FROM accounts WHERE upper(name) = $1
+// Parameters: []interface{}{"FOO"}
+rem.Use[Accounts]().
+	Filter(rem.Unsafe("upper(name)"), "=", "FOO").
+	All(db)
+```
+
+#### Subqueries
+
+REM allows subqueries to be embedded via the standard query syntax.
+
+```go
+// SQL: SELECT * FROM accounts WHERE id IN (SELECT account_id FROM groups WHERE name = $1)
+// Parameters: []interface{}{"Group 1"}
+rem.Use[Accounts]().
+	Filter("id", "IN", rem.Use[Groups]().Select("account_id").Filter("name", "=", "Group 1")).
+	All(db)
+```
+
+The `rem.Exists()` and `rem.NotExists()` functions are provided as a convenience for subqueries that only need to check for the existence of a record.
+
+`rem.Column()` is also used in the following example to properly handle the column name that is used on the right side of a filter.
+
+```go
+// SQL: SELECT * FROM groups WHERE EXISTS (SELECT * FROM accounts WHERE accounts.group_id = groups.id)
+rem.Use[Groups]().
+	FilterAnd(
+		rem.Exists(rem.Use[Accounts]().Filter("accounts.group_id", "=", rem.Column("groups.id")))
+	).
+	All(db)
+```
+
 
 ### First
 
