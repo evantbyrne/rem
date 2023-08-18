@@ -140,7 +140,7 @@ func (model *Model[T]) ScanMap(data map[string]interface{}) (*T, error) {
 	for _, field := range model.Fields {
 		if strings.HasPrefix(field.Type.String(), "rem.OneToMany[") {
 			oneToMany := value.FieldByName(field.Name)
-			oneToMany.FieldByName("RelatedColumn").SetString(field.Tag.Get("related_column"))
+			oneToMany.FieldByName("RelatedColumn").SetString(field.Tag.Get("db"))
 			oneToMany.FieldByName("RowPk").Set(value.FieldByName(model.PrimaryField))
 		}
 	}
@@ -289,7 +289,7 @@ func (model *Model[T]) ToMap(row *T) (map[string]interface{}, error) {
 		field := value.FieldByName(fieldName)
 
 		// Skip zero valued primary keys.
-		if field.IsZero() && model.Fields[column].Tag.Get("primary_key") == "true" {
+		if field.IsZero() && model.Fields[column].Tag.Get("db_primary") == "true" {
 			continue
 		}
 
@@ -375,13 +375,15 @@ func Use[T any](configs ...Config) *Model[T] {
 
 	for _, field := range reflect.VisibleFields(modelType) {
 		if column, ok := field.Tag.Lookup("db"); ok {
-			fields[column] = field
-			if field.Tag.Get("primary_key") == "true" {
-				primaryColumn = column
-				primaryField = field.Name
+			if strings.HasPrefix(field.Type.String(), "rem.OneToMany[") {
+				fields[field.Name] = field
+			} else {
+				fields[column] = field
+				if field.Tag.Get("db_primary") == "true" {
+					primaryColumn = column
+					primaryField = field.Name
+				}
 			}
-		} else if strings.HasPrefix(field.Type.String(), "rem.OneToMany[") {
-			fields[field.Name] = field
 		}
 	}
 

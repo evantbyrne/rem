@@ -44,7 +44,7 @@ func TestColumn(t *testing.T) {
 
 func TestBuildDelete(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
@@ -88,7 +88,7 @@ func TestBuildDelete(t *testing.T) {
 
 func TestBuildInsert(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
@@ -118,7 +118,7 @@ func TestBuildInsert(t *testing.T) {
 
 func TestBuildSelect(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
@@ -282,7 +282,7 @@ func TestBuildTableColumnDrop(t *testing.T) {
 
 func TestBuildTableCreate(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 	}
 
@@ -341,7 +341,7 @@ func TestBuildTableDrop(t *testing.T) {
 
 func TestBuildUpdate(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
@@ -372,11 +372,11 @@ func TestBuildUpdate(t *testing.T) {
 
 func TestColumnType(t *testing.T) {
 	type testFkInt struct {
-		Id int64 `db:"id" primary_key:"true"`
+		Id int64 `db:"id" db_primary:"true"`
 	}
 
 	type testFkString struct {
-		Id string `db:"id" primary_key:"true" db_max_length:"100"`
+		Id string `db:"id" db_primary:"true" db_max_length:"100"`
 	}
 
 	type testModel struct {
@@ -388,7 +388,7 @@ func TestColumnType(t *testing.T) {
 		Default        string                        `db:"test_default" db_default:"'foo'" db_max_length:"100"`
 		Float          float64                       `db:"test_float"`
 		FloatNull      sql.NullFloat64               `db:"test_float_null"`
-		Id             int64                         `db:"test_id" primary_key:"true"`
+		Id             int64                         `db:"test_id" db_primary:"true"`
 		Int            int32                         `db:"test_int"`
 		IntNull        sql.NullInt32                 `db:"test_int_null"`
 		SmallInt       int16                         `db:"test_small_int"`

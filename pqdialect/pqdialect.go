@@ -307,7 +307,7 @@ func (dialect PqDialect) ColumnType(field reflect.StructField) (string, error) {
 	var columnPrimary string
 	var columnType string
 
-	if field.Tag.Get("primary_key") == "true" {
+	if field.Tag.Get("db_primary") == "true" {
 		columnPrimary = " PRIMARY KEY"
 
 		switch fieldInstance.(type) {

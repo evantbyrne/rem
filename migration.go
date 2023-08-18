@@ -16,7 +16,7 @@ type Migration interface {
 type MigrationLogs struct {
 	CreatedAt     time.Time `db:"created_at"`
 	Direction     string    `db:"direction" db_max_length:"10"`
-	Id            int64     `db:"id" primary_key:"true"`
+	Id            int64     `db:"id" db_primary:"true"`
 	MigrationType string    `db:"migration_type" db_max_length:"255"`
 }
 
