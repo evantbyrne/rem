@@ -35,7 +35,7 @@ for _, group := range groups {
 
 ## Features
 
-- PostgreSQL and MySQL dialects. SQLite coming soon.
+- PostgreSQL, MySQL, and SQLite dialects.
 - Data and schema migrations that use the same model syntax.
 - Optimized foreign key and one-to-many prefetching.
 - Interface extensible query builder. Can be used for database-specific features.
@@ -65,7 +65,7 @@ Please post feature requests, questions, and other feedback to the [discussions 
 
 ## Dialects
 
-REM supports PostgreSQL and MySQL. SQLite support is planned. To use a dialect, import the appropriate package and set it as the default once on application bootup.
+REM supports PostgreSQL, MySQL, and SQLite. To use a dialect, import the appropriate package and set it as the default once on application bootup.
 
 ```go
 import (
