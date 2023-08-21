@@ -72,6 +72,7 @@ import (
 	// Choose one:
 	"github.com/evantbyrne/rem/mysqldialect"
 	"github.com/evantbyrne/rem/pqdialect"
+	"github.com/evantbyrne/rem/sqlitedialect"
 
 	// Don't forget to import your database driver.
 )
@@ -79,8 +80,9 @@ import (
 
 ```go
 // Choose one:
-rem.SetDialect(mysqldialect.Dialect{})
-rem.SetDialect(pqdialect.Dialect{})
+rem.SetDialect(mysqldialect.MysqlDialect{})
+rem.SetDialect(pqdialect.PqDialect{})
+rem.SetDialect(sqlitedialect.SqliteDialect{})
 
 // Then connect to your database as usual.
 db, err := sql.Open("<driver>", "<connection string>")
@@ -185,24 +187,26 @@ REM determines column types based on Go field types. The following table shows t
 
 **Note:** REM uses special Go types for nullable columns. Don't use pointers for model fields.
 
-Go | MySQL | PostgreSQL
---- | --- | ---
-`bool` | `BOOLEAN` | `BOOLEAN`
-`[]byte` | - | -
-`int8` | `TINYINT` | `SMALLINT`
-`int16` | `SMALLINT` | `SMALLINT`
-`int32` | `INTEGER` | `INTEGER`
-`int64` | `BIGINT` | `BIGINT`
-`float32` | `FLOAT` | -
-`float64` | `DOUBLE` | `DOUBLE PRECISION`
-`string` | `VARCHAR`,`TEXT`\[1\] | `VARCHAR`,`TEXT`\[1\]
-`time.Time` | `DATETIME`\[2\] | `TIMESTAMP`\[3\]
+Go | MySQL | PostgreSQL | SQLite
+--- | --- | --- | ---
+`bool` | `BOOLEAN` | `BOOLEAN` | `BOOLEAN`\[1\]
+`[]byte` | - | - | -
+`int8` | `TINYINT` | `SMALLINT` | `INTEGER`
+`int16` | `SMALLINT` | `SMALLINT` | `INTEGER`
+`int32` | `INTEGER` | `INTEGER` | `INTEGER`
+`int64` | `BIGINT` | `BIGINT` | `INTEGER`
+`float32` | `FLOAT` | - | `REAL`
+`float64` | `DOUBLE` | `DOUBLE PRECISION` | `REAL`
+`string` | `VARCHAR`,`TEXT`\[2\] | `VARCHAR`,`TEXT`\[2\] | `TEXT`
+`time.Time` | `DATETIME`\[3\] | `TIMESTAMP`\[4\] | `DATETIME`
 
-\[1\] The `VARCHAR` column type is used for `string` and `sql.NullString` fields when the `db_max_length` field tag is provided. Otherwise, `TEXT` is used.
+\[1\] SQLite `BOOLEAN` behaves as an `INTEGER` internally. The SQLite driver should automatically convert `bool` field values to `0` or `1` when parameterized.
 
-\[2\] Go's most popular MySQL driver requires adding the `parseTime=true` GET parameter to the connection string to properly scan into `time.Time` and `sql.NullTime` fields.
+\[2\] The `VARCHAR` column type is used for `string` and `sql.NullString` fields when the `db_max_length` field tag is provided. Otherwise, `TEXT` is used.
 
-\[3\] The PostgreSQL dialect defaults to `WITHOUT TIME ZONE` for time types. Add the `db_time_zone:"true"` field tag to use `WITH TIME ZONE` instead.
+\[3\] Go's most popular MySQL driver requires adding the `parseTime=true` GET parameter to the connection string to properly scan into `time.Time` and `sql.NullTime` fields.
+
+\[4\] The PostgreSQL dialect defaults to `WITHOUT TIME ZONE` for time types. Add the `db_time_zone:"true"` field tag to use `WITH TIME ZONE` instead.
 
 Columns are not nullable by default. REM uses the standard `database/sql` package types to represent nullable columns.
 
