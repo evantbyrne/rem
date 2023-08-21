@@ -73,12 +73,6 @@ func (filter FilterClause) rightString(dialect Dialect, args []interface{}) ([]i
 	case nil:
 		return args, "NULL", nil
 
-	case bool:
-		if right {
-			return args, "TRUE", nil
-		}
-		return args, "FALSE", nil
-
 	case []interface{}:
 		var sliceArgs strings.Builder
 		for j, arg := range right {

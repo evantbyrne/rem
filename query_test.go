@@ -11,7 +11,7 @@ import (
 
 func TestQueryConfigure(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
@@ -31,7 +31,7 @@ func TestQueryConfigure(t *testing.T) {
 
 func TestQueryDetectDialect(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
@@ -48,7 +48,7 @@ func TestQueryDetectDialect(t *testing.T) {
 
 func TestQueryFilters(t *testing.T) {
 	type testModel struct {
-		Id     int64  `db:"test_id" primary_key:"true"`
+		Id     int64  `db:"test_id" db_primary:"true"`
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
@@ -130,11 +130,11 @@ func TestQueryFilters(t *testing.T) {
 
 func TestQueryJoins(t *testing.T) {
 	type testGroups struct {
-		Id   int64  `db:"test_id" primary_key:"true"`
+		Id   int64  `db:"test_id" db_primary:"true"`
 		Name string `db:"name" db_max_length:"100"`
 	}
 	type testAccounts struct {
-		Id    int64                      `db:"id" primary_key:"true"`
+		Id    int64                      `db:"id" db_primary:"true"`
 		Group NullForeignKey[testGroups] `db:"group_id" db_on_delete:"SET NULL"`
 		Name  string                     `db:"name" db_max_length:"100"`
 	}
@@ -198,13 +198,13 @@ func TestQueryJoins(t *testing.T) {
 }
 
 type testGroupsQuerySlice struct {
-	Accounts OneToMany[testAccountsQuerySlice] `related_column:"group_id"`
-	Id       int64                             `db:"id" primary_key:"true"`
+	Accounts OneToMany[testAccountsQuerySlice] `db:"group_id"`
+	Id       int64                             `db:"id" db_primary:"true"`
 	Name     string                            `db:"name" db_max_length:"100"`
 }
 type testAccountsQuerySlice struct {
 	Group NullForeignKey[testGroupsQuerySlice] `db:"group_id" db_on_delete:"SET NULL"`
-	Id    int64                                `db:"id" primary_key:"true"`
+	Id    int64                                `db:"id" db_primary:"true"`
 	Name  string                               `db:"name"`
 }
 

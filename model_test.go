@@ -13,13 +13,13 @@ import (
 
 func TestModelScanMap(t *testing.T) {
 	type testGroups struct {
-		Id   int64  `db:"id" primary_key:"true"`
+		Id   int64  `db:"id" db_primary:"true"`
 		Name string `db:"name" db_max_length:"100"`
 	}
 	type testAccounts struct {
 		EditedAt sql.NullTime               `db:"edited_at"`
 		Group    NullForeignKey[testGroups] `db:"group_id" db_on_delete:"SET NULL"`
-		Id       int64                      `db:"id" primary_key:"true"`
+		Id       int64                      `db:"id" db_primary:"true"`
 		Name     string                     `db:"name"`
 	}
 	model := Use[testAccounts]()
@@ -83,14 +83,14 @@ func TestModelScanMap(t *testing.T) {
 }
 
 type testGroupsModelToMap struct {
-	Accounts OneToMany[testAccountsModelToMap] `related_column:"group_id"`
-	Id       int64                             `db:"id" primary_key:"true"`
+	Accounts OneToMany[testAccountsModelToMap] `db:"group_id"`
+	Id       int64                             `db:"id" db_primary:"true"`
 	Name     string                            `db:"name" db_max_length:"100"`
 }
 type testAccountsModelToMap struct {
 	EditedAt sql.NullTime                         `db:"edited_at"`
 	Group    NullForeignKey[testGroupsModelToMap] `db:"group_id" db_on_delete:"SET NULL"`
-	Id       int64                                `db:"id" primary_key:"true"`
+	Id       int64                                `db:"id" db_primary:"true"`
 	Name     string                               `db:"name"`
 }
 
@@ -187,7 +187,7 @@ func TestRegister(t *testing.T) {
 		registeredModels = make(map[string]interface{})
 	}()
 	type testModel struct {
-		Id   int64  `db:"id" primary_key:"true"`
+		Id   int64  `db:"id" db_primary:"true"`
 		Name string `db:"name"`
 	}
 	m1 := Use[testModel]()
@@ -208,7 +208,7 @@ func TestRegister(t *testing.T) {
 func TestScanToMap(t *testing.T) {
 	type testAccounts struct {
 		EditedAt sql.NullTime `db:"edited_at"`
-		Id       int64        `db:"id" primary_key:"true"`
+		Id       int64        `db:"id" db_primary:"true"`
 		Name     string       `db:"name"`
 	}
 	accounts := Use[testAccounts]()
@@ -261,13 +261,13 @@ func TestScanToMap(t *testing.T) {
 func TestUse(t *testing.T) {
 	type testAccounts struct {
 		EditedAt sql.NullTime `db:"edited_at"`
-		Id       int64        `db:"id" primary_key:"true"`
+		Id       int64        `db:"id" db_primary:"true"`
 		Name     string       `db:"name"`
 	}
 	type testGroups struct {
-		Id       int64                   `db:"id" primary_key:"true"`
+		Id       int64                   `db:"id" db_primary:"true"`
 		Name     string                  `db:"name" db_max_length:"100"`
-		Accounts OneToMany[testAccounts] `related_column:"group_id"`
+		Accounts OneToMany[testAccounts] `db:"group_id"`
 	}
 	groups := Use[testGroups]()
 	columns := maps.Keys(groups.Fields)

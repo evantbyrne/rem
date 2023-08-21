@@ -5,13 +5,13 @@ The retro Golang ORM. **R**etro **E**ntity **M**apper.
 ```go
 type Accounts struct {
 	Group rem.NullForeignKey[Groups] `db:"group_id"`
-	Id    int64                      `db:"id" primary_key:"true"`
+	Id    int64                      `db:"id" db_primary:"true"`
 	Name  string                     `db:"name"`
 }
 
 type Groups struct {
-	Accounts rem.OneToMany[Accounts] `related_column:"group_id"`
-	Id       int64                   `db:"id" primary_key:"true"`
+	Accounts rem.OneToMany[Accounts] `db:"group_id"`
+	Id       int64                   `db:"id" db_primary:"true"`
 	Name     string                  `db:"name" db_max_length:"100"`
 }
 ```
@@ -72,6 +72,7 @@ import (
 	// Choose one:
 	"github.com/evantbyrne/rem/mysqldialect"
 	"github.com/evantbyrne/rem/pqdialect"
+	"github.com/evantbyrne/rem/sqlitedialect"
 
 	// Don't forget to import your database driver.
 )
@@ -79,8 +80,9 @@ import (
 
 ```go
 // Choose one:
-rem.SetDialect(mysqldialect.Dialect{})
-rem.SetDialect(pqdialect.Dialect{})
+rem.SetDialect(mysqldialect.MysqlDialect{})
+rem.SetDialect(pqdialect.PqDialect{})
+rem.SetDialect(sqlitedialect.SqliteDialect{})
 
 // Then connect to your database as usual.
 db, err := sql.Open("<driver>", "<connection string>")
@@ -97,7 +99,7 @@ Models are structs that define table schemas.
 
 ```go
 type Accounts struct {
-	Id   int64  `db:"id" primary_key:"true"`
+	Id   int64  `db:"id" db_primary:"true"`
 	Name string `db:"name" db_max_length:"100"`
 	Junk string
 }
@@ -145,7 +147,7 @@ type Migration0001Accounts struct{}
 func (m Migration0001Accounts) Up(db *sql.DB) error {
 	// We embed the Accounts model to avoid colliding with the package-level Accounts model used for queries. You could also use `rem.Config` as demonstrated in the Models documentation section.
 	type Accounts struct {
-		Id   int64  `db:"id" primary_key:"true"`
+		Id   int64  `db:"id" db_primary:"true"`
 		Name string `db:"name" db_max_length:"100"`
 	}
 
@@ -185,24 +187,26 @@ REM determines column types based on Go field types. The following table shows t
 
 **Note:** REM uses special Go types for nullable columns. Don't use pointers for model fields.
 
-Go | MySQL | PostgreSQL
---- | --- | ---
-`bool` | `BOOLEAN` | `BOOLEAN`
-`[]byte` | - | -
-`int8` | `TINYINT` | `SMALLINT`
-`int16` | `SMALLINT` | `SMALLINT`
-`int32` | `INTEGER` | `INTEGER`
-`int64` | `BIGINT` | `BIGINT`
-`float32` | `FLOAT` | -
-`float64` | `DOUBLE` | `DOUBLE PRECISION`
-`string` | `VARCHAR`,`TEXT`\[1\] | `VARCHAR`,`TEXT`\[1\]
-`time.Time` | `DATETIME`\[2\] | `TIMESTAMP`\[3\]
+Go | MySQL | PostgreSQL | SQLite
+--- | --- | --- | ---
+`bool` | `BOOLEAN` | `BOOLEAN` | `BOOLEAN`\[1\]
+`[]byte` | - | - | -
+`int8` | `TINYINT` | `SMALLINT` | `INTEGER`
+`int16` | `SMALLINT` | `SMALLINT` | `INTEGER`
+`int32` | `INTEGER` | `INTEGER` | `INTEGER`
+`int64` | `BIGINT` | `BIGINT` | `INTEGER`
+`float32` | `FLOAT` | - | `REAL`
+`float64` | `DOUBLE` | `DOUBLE PRECISION` | `REAL`
+`string` | `VARCHAR`,`TEXT`\[2\] | `VARCHAR`,`TEXT`\[2\] | `TEXT`
+`time.Time` | `DATETIME`\[3\] | `TIMESTAMP`\[4\] | `DATETIME`
 
-\[1\] The `VARCHAR` column type is used for `string` and `sql.NullString` fields when the `db_max_length` field tag is provided. Otherwise, `TEXT` is used.
+\[1\] SQLite `BOOLEAN` behaves as an `INTEGER` internally. The SQLite driver should automatically convert `bool` field values to `0` or `1` when parameterized.
 
-\[2\] Go's most popular MySQL driver requires adding the `parseTime=true` GET parameter to the connection string to properly scan into `time.Time` and `sql.NullTime` fields.
+\[2\] The `VARCHAR` column type is used for `string` and `sql.NullString` fields when the `db_max_length` field tag is provided. Otherwise, `TEXT` is used.
 
-\[3\] The PostgreSQL dialect defaults to `WITHOUT TIME ZONE` for time types. Add the `db_time_zone:"true"` field tag to use `WITH TIME ZONE` instead.
+\[3\] Go's most popular MySQL driver requires adding the `parseTime=true` GET parameter to the connection string to properly scan into `time.Time` and `sql.NullTime` fields.
+
+\[4\] The PostgreSQL dialect defaults to `WITHOUT TIME ZONE` for time types. Add the `db_time_zone:"true"` field tag to use `WITH TIME ZONE` instead.
 
 Columns are not nullable by default. REM uses the standard `database/sql` package types to represent nullable columns.
 
@@ -217,17 +221,17 @@ Not Null | Nullable
 `string` | `sql.NullString`
 `time.Time` | `sql.NullTime`
 
-Primary keys are specified with the `primary_key:"true"` field tag. All models must have a primary key. Integer fields that are primary keys will auto-increment.
+Primary keys are specified with the `db_primary:"true"` field tag. All models must have a primary key. Integer fields that are primary keys will auto-increment.
 
 ```go
 // An auto-incrementing primary key.
 type A struct {
-	Id int64  `db:"id" primary_key:"true"`
+	Id int64  `db:"id" db_primary:"true"`
 }
 
 // VARCHAR primary key with no default value.
 type B struct {
-	Guid string `db:"guid" db_max_length:"36" primary_key:"true"`
+	Guid string `db:"guid" db_max_length:"36" db_primary:"true"`
 }
 ```
 
@@ -265,13 +269,13 @@ Custom column types can be set using the `db_type` field tag, which accpets any 
 ```go
 // An example of using PostgreSQL's JSONB type.
 type A struct {
-	Id   int64  `db:"id" primary_key:"true"`
+	Id   int64  `db:"id" db_primary:"true"`
 	Data []byte `db:"data" db_type:"JSONB NOT NULL"`
 }
 
 // db_type takes priority over all other field tags, including primary key typing.
 type B struct {
-	Guid string `db:"guid" db_type:"CHAR(36) NOT NULL" primary_key:"true"`
+	Guid string `db:"guid" db_type:"CHAR(36) NOT NULL" db_primary:"true"`
 }
 ```
 
@@ -281,17 +285,17 @@ Custom Go types may also be used for model fields, but they must implement the `
 
 Foreign keys are specified with the `rem.ForeignKey[To]` and `rem.NullForeignKey[To]` field types. REM automatically matches the foreign key column type to the primary key of the target model.
 
-On the other end of the relation, use `rem.OneToMany[To]`.
+On the other side of the relation, use `rem.OneToMany[To]`. On both sides of the relation, the `db` field tag signifies the column on the `rem.ForeignKey[To]` side.
 
 ```go
 type Groups struct {
-	Members rem.OneToMany[Members] `related_column:"group_id"`
-	Id      int64                  `db:"id" primary_key:"true"`
+	Members rem.OneToMany[Members] `db:"group_id"`
+	Id      int64                  `db:"id" db_primary:"true"`
 }
 
 type Members struct {
 	Group rem.ForeignKey[Groups] `db:"group_id"`
-	Id    int64                  `db:"id" primary_key:"true"`
+	Id    int64                  `db:"id" db_primary:"true"`
 }
 ```
 
@@ -391,13 +395,13 @@ Regardless of which side of the relationship you start from or how many records 
 // Model definitions for Groups <->> Accounts relationship.
 type Accounts struct {
 	Group rem.ForeignKey[Groups] `db:"group_id"`
-	Id    int64                  `db:"id" primary_key:"true"`
+	Id    int64                  `db:"id" db_primary:"true"`
 	Name  string                 `db:"name" db_max_length:"100"`
 }
 
 type Groups struct {
-	Accounts rem.OneToMany[Accounts] `related_column:"group_id"`
-	Id       int64                   `db:"id" primary_key:"true"`
+	Accounts rem.OneToMany[Accounts] `db:"group_id"`
+	Id       int64                   `db:"id" db_primary:"true"`
 	Name     string                  `db:"name" db_max_length:"100"`
 }
 ```
@@ -580,8 +584,8 @@ rows, err := rem.Use[Accounts]().
 
 // Use a custom model.
 type AccountsWithGroupName struct {
-    GroupName string `db:"group_name"`
-	Id        string `db:"id" primary_key:"true"`
+	GroupName string `db:"group_name"`
+	Id        string `db:"id" db_primary:"true"`
 	Name      string `db:"name"`
 }
 
@@ -677,9 +681,9 @@ The `TableColumnAdd` method adds a column to a table. A field must exist in the 
 
 ```go
 type Accounts struct {
-    Id      int64  `db:"id" primary_key:"true"`
-    Name    string `db:"name"`
-    IsAdmin bool   `db:"is_admin"`
+	Id      int64  `db:"id" db_primary:"true"`
+	Name    string `db:"name"`
+	IsAdmin bool   `db:"is_admin"`
 }
 
 _, err := rem.Use[Accounts]().TableColumnAdd(db, "is_admin")

@@ -485,7 +485,7 @@ func (query *Query[T]) slice(db *sql.DB) ([]*T, error) {
 						}
 
 						if relatedField == "" {
-							return rows, fmt.Errorf("rem: invalid related_column tag of '%s' for fetching related on field '%s'. No fields with a matching column exist on the related model", relatedColumn, column)
+							return rows, fmt.Errorf("rem: invalid db tag of '%s' for fetching related on field '%s'. No fields with a matching column exist on the related model", relatedColumn, column)
 						}
 
 						rpk = relatedPk{

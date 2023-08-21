@@ -1,4 +1,4 @@
-package mysqldialect
+package sqlitedialect
 
 import (
 	"database/sql"
@@ -12,9 +12,11 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type MysqlDialect struct{}
+type SqliteDialect struct {
+	PreserveBooleans bool
+}
 
-func (dialect MysqlDialect) BuildDelete(config rem.QueryConfig) (string, []interface{}, error) {
+func (dialect SqliteDialect) BuildDelete(config rem.QueryConfig) (string, []interface{}, error) {
 	args := append([]interface{}(nil), config.Params...)
 	var queryString strings.Builder
 	queryString.WriteString("DELETE FROM ")
@@ -61,7 +63,7 @@ func (dialect MysqlDialect) BuildDelete(config rem.QueryConfig) (string, []inter
 	return queryString.String(), args, nil
 }
 
-func (dialect MysqlDialect) BuildInsert(config rem.QueryConfig, rowMap map[string]interface{}, columns ...string) (string, []interface{}, error) {
+func (dialect SqliteDialect) BuildInsert(config rem.QueryConfig, rowMap map[string]interface{}, columns ...string) (string, []interface{}, error) {
 	args := make([]interface{}, 0)
 	var queryString strings.Builder
 
@@ -98,7 +100,7 @@ func (dialect MysqlDialect) BuildInsert(config rem.QueryConfig, rowMap map[strin
 	return queryString.String(), args, nil
 }
 
-func (dialect MysqlDialect) buildJoins(config rem.QueryConfig, args []interface{}) (string, []interface{}, error) {
+func (dialect SqliteDialect) buildJoins(config rem.QueryConfig, args []interface{}) (string, []interface{}, error) {
 	var queryPart strings.Builder
 	if len(config.Joins) > 0 {
 		for _, join := range config.Joins {
@@ -118,7 +120,7 @@ func (dialect MysqlDialect) buildJoins(config rem.QueryConfig, args []interface{
 	return queryPart.String(), args, nil
 }
 
-func (dialect MysqlDialect) BuildSelect(config rem.QueryConfig) (string, []interface{}, error) {
+func (dialect SqliteDialect) BuildSelect(config rem.QueryConfig) (string, []interface{}, error) {
 	args := append([]interface{}(nil), config.Params...)
 	var queryString strings.Builder
 	if config.Count {
@@ -201,7 +203,7 @@ func (dialect MysqlDialect) BuildSelect(config rem.QueryConfig) (string, []inter
 	return queryString.String(), args, nil
 }
 
-func (dialect MysqlDialect) BuildTableColumnAdd(config rem.QueryConfig, column string) (string, error) {
+func (dialect SqliteDialect) BuildTableColumnAdd(config rem.QueryConfig, column string) (string, error) {
 	field, ok := config.Fields[column]
 	if !ok {
 		return "", fmt.Errorf("rem: invalid column '%s' on model for table '%s'", column, config.Table)
@@ -214,11 +216,11 @@ func (dialect MysqlDialect) BuildTableColumnAdd(config rem.QueryConfig, column s
 	return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", dialect.QuoteIdentifier(config.Table), dialect.QuoteIdentifier(column), columnType), nil
 }
 
-func (dialect MysqlDialect) BuildTableColumnDrop(config rem.QueryConfig, column string) (string, error) {
+func (dialect SqliteDialect) BuildTableColumnDrop(config rem.QueryConfig, column string) (string, error) {
 	return fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", dialect.QuoteIdentifier(config.Table), dialect.QuoteIdentifier(column)), nil
 }
 
-func (dialect MysqlDialect) BuildTableCreate(config rem.QueryConfig, tableCreateConfig rem.TableCreateConfig) (string, error) {
+func (dialect SqliteDialect) BuildTableCreate(config rem.QueryConfig, tableCreateConfig rem.TableCreateConfig) (string, error) {
 	var sql strings.Builder
 	sql.WriteString("CREATE TABLE ")
 	if tableCreateConfig.IfNotExists {
@@ -243,10 +245,11 @@ func (dialect MysqlDialect) BuildTableCreate(config rem.QueryConfig, tableCreate
 		sql.WriteString(columnType)
 	}
 	sql.WriteString("\n)")
+
 	return sql.String(), nil
 }
 
-func (dialect MysqlDialect) BuildTableDrop(config rem.QueryConfig, tableDropConfig rem.TableDropConfig) (string, error) {
+func (dialect SqliteDialect) BuildTableDrop(config rem.QueryConfig, tableDropConfig rem.TableDropConfig) (string, error) {
 	var queryString strings.Builder
 	queryString.WriteString("DROP TABLE ")
 	if tableDropConfig.IfExists {
@@ -256,7 +259,7 @@ func (dialect MysqlDialect) BuildTableDrop(config rem.QueryConfig, tableDropConf
 	return queryString.String(), nil
 }
 
-func (dialect MysqlDialect) BuildUpdate(config rem.QueryConfig, rowMap map[string]interface{}, columns ...string) (string, []interface{}, error) {
+func (dialect SqliteDialect) BuildUpdate(config rem.QueryConfig, rowMap map[string]interface{}, columns ...string) (string, []interface{}, error) {
 	args := append([]interface{}(nil), config.Params...)
 	var queryString strings.Builder
 
@@ -322,7 +325,7 @@ func (dialect MysqlDialect) BuildUpdate(config rem.QueryConfig, rowMap map[strin
 	return queryString.String(), args, nil
 }
 
-func (dialect MysqlDialect) buildWhere(config rem.QueryConfig, args []interface{}) (string, []interface{}, error) {
+func (dialect SqliteDialect) buildWhere(config rem.QueryConfig, args []interface{}) (string, []interface{}, error) {
 	var queryPart strings.Builder
 	if len(config.Filters) > 0 {
 		queryPart.WriteString(" WHERE")
@@ -338,7 +341,7 @@ func (dialect MysqlDialect) buildWhere(config rem.QueryConfig, args []interface{
 	return queryPart.String(), args, nil
 }
 
-func (dialect MysqlDialect) ColumnType(field reflect.StructField) (string, error) {
+func (dialect SqliteDialect) ColumnType(field reflect.StructField) (string, error) {
 	tagType := field.Tag.Get("db_type")
 	if tagType != "" {
 		return tagType, nil
@@ -351,130 +354,77 @@ func (dialect MysqlDialect) ColumnType(field reflect.StructField) (string, error
 
 	if field.Tag.Get("db_primary") == "true" {
 		columnPrimary = " PRIMARY KEY"
-
-		switch fieldInstance.(type) {
-		case int, int64:
-			columnNull = " NOT NULL AUTO_INCREMENT"
-			columnType = "BIGINT"
-
-		case int32:
-			columnNull = " NOT NULL AUTO_INCREMENT"
-			columnType = "INTEGER"
-
-		case int16:
-			columnNull = " NOT NULL AUTO_INCREMENT"
-			columnType = "SMALLINT"
-
-		case int8:
-			columnNull = " NOT NULL AUTO_INCREMENT"
-			columnType = "TINYINT"
-		}
 	}
 
-	if columnType == "" {
-		switch fieldInstance.(type) {
-		case bool:
+	switch fieldInstance.(type) {
+	case bool:
+		columnNull = " NOT NULL"
+		columnType = "BOOLEAN"
+
+	case int, int8, int16, int32, int64:
+		columnNull = " NOT NULL"
+		columnType = "INTEGER"
+
+	case sql.NullBool:
+		columnNull = " NULL"
+		columnType = "BOOLEAN"
+
+	case sql.NullInt16, sql.NullInt32, sql.NullInt64:
+		columnNull = " NULL"
+		columnType = "INTEGER"
+
+	case float32, float64:
+		columnNull = " NOT NULL"
+		columnType = "REAL"
+
+	case sql.NullFloat64:
+		columnNull = " NULL"
+		columnType = "REAL"
+
+	case string:
+		columnNull = " NOT NULL"
+		columnType = "TEXT"
+
+	case time.Time:
+		columnNull = " NOT NULL"
+		columnType = "DATETIME"
+
+	case sql.NullString:
+		columnNull = " NULL"
+		columnType = "TEXT"
+
+	case sql.NullTime:
+		columnNull = " NULL"
+		columnType = "DATETIME"
+
+	default:
+		if strings.HasPrefix(field.Type.String(), "rem.ForeignKey[") || strings.HasPrefix(field.Type.String(), "rem.NullForeignKey[") {
+			// Foreign keys.
+			fv := reflect.New(field.Type).Elem()
+			subModelQ := fv.Addr().MethodByName("Model").Call(nil)
+			subFields := reflect.Indirect(subModelQ[0]).FieldByName("Fields").Interface().(map[string]reflect.StructField)
+			subPrimaryColumn := reflect.Indirect(subModelQ[0]).FieldByName("PrimaryColumn").Interface().(string)
+			subTable := reflect.Indirect(subModelQ[0]).FieldByName("Table").Interface().(string)
+			columnTypeTemp, err := dialect.ColumnType(subFields[subPrimaryColumn])
+			if err != nil {
+				return "", err
+			}
+			columnType = strings.SplitN(columnTypeTemp, " ", 2)[0]
+
 			columnNull = " NOT NULL"
-			columnType = "BOOLEAN"
+			if strings.HasPrefix(field.Type.String(), "rem.NullForeignKey[") {
+				columnNull = " NULL"
+			}
+			columnNull = fmt.Sprintf("%s REFERENCES %s (%s)", columnNull, dialect.QuoteIdentifier(subTable), dialect.QuoteIdentifier(subPrimaryColumn))
 
-		case sql.NullBool:
-			columnNull = " NULL"
-			columnType = "BOOLEAN"
-
-		case float32:
-			columnNull = " NOT NULL"
-			columnType = "FLOAT"
-
-		case float64:
-			columnNull = " NOT NULL"
-			columnType = "DOUBLE"
-
-		case sql.NullFloat64:
-			columnNull = " NULL"
-			columnType = "DOUBLE"
-
-		case int, int64:
-			columnNull = " NOT NULL"
-			columnType = "BIGINT"
-
-		case sql.NullInt64:
-			columnNull = " NULL"
-			columnType = "BIGINT"
-
-		case int32:
-			columnNull = " NOT NULL"
-			columnType = "INTEGER"
-
-		case sql.NullInt32:
-			columnNull = " NULL"
-			columnType = "INTEGER"
-
-		case int8:
-			columnNull = " NOT NULL"
-			columnType = "TINYINT"
-
-		case int16:
-			columnNull = " NOT NULL"
-			columnType = "SMALLINT"
-
-		case sql.NullInt16:
-			columnNull = " NULL"
-			columnType = "SMALLINT"
-
-		case string:
-			columnNull = " NOT NULL"
-			if tagMaxLength := field.Tag.Get("db_max_length"); tagMaxLength != "" {
-				columnType = fmt.Sprintf("VARCHAR(%s)", tagMaxLength)
-			} else {
-				columnType = "TEXT"
+			if tagOnUpdate := field.Tag.Get("db_on_update"); tagOnUpdate != "" {
+				// ON UPDATE.
+				columnNull = fmt.Sprint(columnNull, " ON UPDATE ", tagOnUpdate)
 			}
 
-		case sql.NullString:
-			columnNull = " NULL"
-			if tagMaxLength := field.Tag.Get("db_max_length"); tagMaxLength != "" {
-				columnType = fmt.Sprintf("VARCHAR(%s)", tagMaxLength)
-			} else {
-				columnType = "TEXT"
-			}
-
-		case time.Time:
-			columnNull = " NOT NULL"
-			columnType = "DATETIME"
-
-		case sql.NullTime:
-			columnNull = " NULL"
-			columnType = "DATETIME"
-
-		default:
-			if strings.HasPrefix(field.Type.String(), "rem.ForeignKey[") || strings.HasPrefix(field.Type.String(), "rem.NullForeignKey[") {
-				// Foreign keys.
-				fv := reflect.New(field.Type).Elem()
-				subModelQ := fv.Addr().MethodByName("Model").Call(nil)
-				subFields := reflect.Indirect(subModelQ[0]).FieldByName("Fields").Interface().(map[string]reflect.StructField)
-				subPrimaryColumn := reflect.Indirect(subModelQ[0]).FieldByName("PrimaryColumn").Interface().(string)
-				subTable := reflect.Indirect(subModelQ[0]).FieldByName("Table").Interface().(string)
-				columnTypeTemp, err := dialect.ColumnType(subFields[subPrimaryColumn])
-				if err != nil {
-					return "", err
-				}
-				columnType = strings.SplitN(columnTypeTemp, " ", 2)[0]
-				columnType = strings.Replace(columnType, " AUTO_INCREMENT", "", 1)
-
-				columnNull = " NOT NULL"
-				if strings.HasPrefix(field.Type.String(), "rem.NullForeignKey[") {
-					columnNull = " NULL"
-				}
-				columnNull = fmt.Sprintf("%s REFERENCES %s (%s)", columnNull, dialect.QuoteIdentifier(subTable), dialect.QuoteIdentifier(subPrimaryColumn))
-
-				if tagOnUpdate := field.Tag.Get("db_on_update"); tagOnUpdate != "" {
-					// ON UPDATE.
-					columnNull = fmt.Sprint(columnNull, " ON UPDATE ", tagOnUpdate)
-				}
-
-				if tagOnDelete := field.Tag.Get("db_on_delete"); tagOnDelete != "" {
-					// ON DELETE.
-					columnNull = fmt.Sprint(columnNull, " ON DELETE ", tagOnDelete)
-				}
+			if tagOnDelete := field.Tag.Get("db_on_delete"); tagOnDelete != "" {
+				// ON DELETE.
+				columnNull = fmt.Sprint(columnNull, " ON DELETE ", tagOnDelete)
 			}
 		}
 	}
@@ -496,11 +446,11 @@ func (dialect MysqlDialect) ColumnType(field reflect.StructField) (string, error
 	return fmt.Sprint(columnType, columnPrimary, columnNull), nil
 }
 
-func (dialect MysqlDialect) Param(identifier int) string {
+func (dialect SqliteDialect) Param(identifier int) string {
 	return "?"
 }
 
-func (dialect MysqlDialect) QuoteIdentifier(identifier string) string {
+func (dialect SqliteDialect) QuoteIdentifier(identifier string) string {
 	var query strings.Builder
 	for i, part := range strings.Split(identifier, ".") {
 		if i > 0 {

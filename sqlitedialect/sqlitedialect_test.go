@@ -1,4 +1,4 @@
-package mysqldialect
+package sqlitedialect
 
 import (
 	"database/sql"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestAs(t *testing.T) {
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	expected := map[string]rem.SqlAs{
 		"`x` AS `alias1`":        rem.As("x", "alias1"),
 		"`x` AS `y` AS `alias2`": rem.As(rem.As("x", "y"), "alias2"),
@@ -27,7 +27,7 @@ func TestAs(t *testing.T) {
 }
 
 func TestColumn(t *testing.T) {
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	expected := map[string]rem.SqlColumn{
 		"`x`":         rem.Column("x"),
 		"`x`.`y`":     rem.Column("x.y"),
@@ -49,7 +49,7 @@ func TestBuildDelete(t *testing.T) {
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
 
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	model := rem.Use[testModel]()
 
 	query := model.Query()
@@ -130,7 +130,7 @@ func TestBuildInsert(t *testing.T) {
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
 
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	model := rem.Use[testModel]()
 
 	config := model.Query().Config
@@ -160,7 +160,7 @@ func TestBuildSelect(t *testing.T) {
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
 
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	model := rem.Use[testModel]()
 
 	config := model.Query().Config
@@ -288,13 +288,13 @@ func TestBuildTableColumnAdd(t *testing.T) {
 		Value string `db:"test_value" db_max_length:"100"`
 	}
 
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	model := rem.Use[testModel]()
 	config := rem.QueryConfig{
 		Fields: model.Fields,
 		Table:  "testmodel",
 	}
-	expectedSql := "ALTER TABLE `testmodel` ADD COLUMN `test_value` VARCHAR(100) NOT NULL"
+	expectedSql := "ALTER TABLE `testmodel` ADD COLUMN `test_value` TEXT NOT NULL"
 	queryString, err := dialect.BuildTableColumnAdd(config, "test_value")
 	if err != nil {
 		t.Errorf("Unexpected error %s", err.Error())
@@ -305,7 +305,7 @@ func TestBuildTableColumnAdd(t *testing.T) {
 }
 
 func TestBuildTableColumnDrop(t *testing.T) {
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	config := rem.QueryConfig{Table: "testmodel"}
 	expectedSql := "ALTER TABLE `testmodel` DROP COLUMN `test_value`"
 	queryString, err := dialect.BuildTableColumnDrop(config, "test_value")
@@ -323,15 +323,15 @@ func TestBuildTableCreate(t *testing.T) {
 		Value1 string `db:"test_value_1" db_max_length:"100"`
 	}
 
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	model := rem.Use[testModel]()
 	config := rem.QueryConfig{
 		Fields: model.Fields,
 		Table:  "testmodel",
 	}
 	expectedSql := "CREATE TABLE `testmodel` (\n" +
-		"\t`test_id` BIGINT PRIMARY KEY NOT NULL AUTO_INCREMENT,\n" +
-		"\t`test_value_1` VARCHAR(100) NOT NULL\n" +
+		"\t`test_id` INTEGER PRIMARY KEY NOT NULL,\n" +
+		"\t`test_value_1` TEXT NOT NULL\n" +
 		")"
 	queryString, err := dialect.BuildTableCreate(config, rem.TableCreateConfig{})
 	if err != nil {
@@ -342,8 +342,8 @@ func TestBuildTableCreate(t *testing.T) {
 	}
 
 	expectedSql = "CREATE TABLE IF NOT EXISTS `testmodel` (\n" +
-		"\t`test_id` BIGINT PRIMARY KEY NOT NULL AUTO_INCREMENT,\n" +
-		"\t`test_value_1` VARCHAR(100) NOT NULL\n" +
+		"\t`test_id` INTEGER PRIMARY KEY NOT NULL,\n" +
+		"\t`test_value_1` TEXT NOT NULL\n" +
 		")"
 	queryString, err = dialect.BuildTableCreate(config, rem.TableCreateConfig{IfNotExists: true})
 	if err != nil {
@@ -355,7 +355,7 @@ func TestBuildTableCreate(t *testing.T) {
 }
 
 func TestBuildTableDrop(t *testing.T) {
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	config := rem.QueryConfig{Table: "testmodel"}
 	expectedSql := "DROP TABLE `testmodel`"
 	queryString, err := dialect.BuildTableDrop(config, rem.TableDropConfig{})
@@ -383,7 +383,7 @@ func TestBuildUpdate(t *testing.T) {
 		Value2 string `db:"test_value_2" db_max_length:"100"`
 	}
 
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	model := rem.Use[testModel]()
 
 	query := model.Filter("test_id", "=", 1)
@@ -463,7 +463,7 @@ func TestColumnType(t *testing.T) {
 		BigIntNull     sql.NullInt64                 `db:"test_big_int_null"`
 		Bool           bool                          `db:"test_bool"`
 		BoolNull       sql.NullBool                  `db:"test_bool_null"`
-		Custom         []byte                        `db:"test_custom" db_type:"BINARY(128) NOT NULL"`
+		Custom         []byte                        `db:"test_custom" db_type:"BLOB NOT NULL"`
 		Default        string                        `db:"test_default" db_default:"'foo'" db_max_length:"100"`
 		Float          float32                       `db:"test_float"`
 		Double         float64                       `db:"test_double"`
@@ -476,7 +476,7 @@ func TestColumnType(t *testing.T) {
 		Text           string                        `db:"test_text"`
 		TextNull       sql.NullString                `db:"test_text_null"`
 		Time           time.Time                     `db:"test_time"`
-		TimeNow        time.Time                     `db:"test_time_now" db_default:"now()"`
+		TimeNow        time.Time                     `db:"test_time_now" db_default:"CURRENT_TIMESTAMP"`
 		TimeNull       sql.NullTime                  `db:"test_time_null"`
 		TinyInt        int8                          `db:"test_tiny_int"`
 		Varchar        string                        `db:"test_varchar" db_max_length:"100"`
@@ -487,34 +487,34 @@ func TestColumnType(t *testing.T) {
 	}
 
 	expected := map[string]string{
-		"test_big_int":        "BIGINT NOT NULL",
-		"test_big_int_null":   "BIGINT NULL",
+		"test_big_int":        "INTEGER NOT NULL",
+		"test_big_int_null":   "INTEGER NULL",
 		"test_bool":           "BOOLEAN NOT NULL",
 		"test_bool_null":      "BOOLEAN NULL",
-		"test_custom":         "BINARY(128) NOT NULL",
-		"test_default":        "VARCHAR(100) NOT NULL DEFAULT 'foo'",
-		"test_float":          "FLOAT NOT NULL",
-		"test_double":         "DOUBLE NOT NULL",
-		"test_double_null":    "DOUBLE NULL",
-		"test_id":             "BIGINT PRIMARY KEY NOT NULL AUTO_INCREMENT",
+		"test_custom":         "BLOB NOT NULL",
+		"test_default":        "TEXT NOT NULL DEFAULT 'foo'",
+		"test_float":          "REAL NOT NULL",
+		"test_double":         "REAL NOT NULL",
+		"test_double_null":    "REAL NULL",
+		"test_id":             "INTEGER PRIMARY KEY NOT NULL",
 		"test_int":            "INTEGER NOT NULL",
 		"test_int_null":       "INTEGER NULL",
-		"test_small_int":      "SMALLINT NOT NULL",
-		"test_small_int_null": "SMALLINT NULL",
+		"test_small_int":      "INTEGER NOT NULL",
+		"test_small_int_null": "INTEGER NULL",
 		"test_time":           "DATETIME NOT NULL",
-		"test_time_now":       "DATETIME NOT NULL DEFAULT now()",
+		"test_time_now":       "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
 		"test_time_null":      "DATETIME NULL",
 		"test_text":           "TEXT NOT NULL",
 		"test_text_null":      "TEXT NULL",
-		"test_tiny_int":       "TINYINT NOT NULL",
-		"test_varchar":        "VARCHAR(100) NOT NULL",
-		"test_varchar_null":   "VARCHAR(50) NULL",
-		"test_fk_id":          "VARCHAR(100) NOT NULL REFERENCES `testfkstring` (`id`) ON DELETE CASCADE",
-		"test_fk_null_id":     "BIGINT NULL REFERENCES `testfkint` (`id`) ON UPDATE SET NULL ON DELETE SET NULL",
-		"test_unique":         "VARCHAR(255) NOT NULL UNIQUE",
+		"test_tiny_int":       "INTEGER NOT NULL",
+		"test_varchar":        "TEXT NOT NULL",
+		"test_varchar_null":   "TEXT NULL",
+		"test_fk_id":          "TEXT NOT NULL REFERENCES `testfkstring` (`id`) ON DELETE CASCADE",
+		"test_fk_null_id":     "INTEGER NULL REFERENCES `testfkint` (`id`) ON UPDATE SET NULL ON DELETE SET NULL",
+		"test_unique":         "TEXT NOT NULL UNIQUE",
 	}
 
-	dialect := MysqlDialect{}
+	dialect := SqliteDialect{}
 	model := rem.Use[testModel]()
 	fieldKeys := maps.Keys(model.Fields)
 	sort.Strings(fieldKeys)
