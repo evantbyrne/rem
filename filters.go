@@ -25,6 +25,7 @@ var filterOperators = map[string]struct{}{
 	"<> ANY":     {},
 	"EXISTS":     {},
 	"NOT EXISTS": {},
+	"OVERLAPS":   {},
 	"?":          {},
 	"?&":         {},
 	"?|":         {},
