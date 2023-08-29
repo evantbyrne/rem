@@ -232,7 +232,7 @@ func (query *Query[T]) FilterAnd(clauses ...interface{}) *Query[T] {
 	query.Config.Filters = append(query.Config.Filters, FilterClause{Rule: "("})
 	indent := 0
 	for i, clause := range flat {
-		if i > 0 && indent == 0 {
+		if i > 0 && indent == 0 && flat[i-1].Rule != "NOT" {
 			query.Config.Filters = append(query.Config.Filters, FilterClause{Rule: "AND"})
 		}
 		if clause.Rule == "(" {
@@ -259,7 +259,7 @@ func (query *Query[T]) FilterOr(clauses ...interface{}) *Query[T] {
 	query.Config.Filters = append(query.Config.Filters, FilterClause{Rule: "("})
 	indent := 0
 	for i, clause := range flat {
-		if i > 0 && indent == 0 {
+		if i > 0 && indent == 0 && flat[i-1].Rule != "NOT" {
 			query.Config.Filters = append(query.Config.Filters, FilterClause{Rule: "OR"})
 		}
 		if clause.Rule == "(" {

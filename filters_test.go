@@ -35,6 +35,41 @@ func TestFilterAnd(t *testing.T) {
 	}
 }
 
+func TestFilterNot(t *testing.T) {
+	clauses := And(
+		"SKIP",
+		FilterClause{Rule: "A"},
+		Not("B", "=", "foo"),
+		Or(
+			Not("C.1", "=", "bar"),
+			FilterClause{Rule: "C.2"},
+		),
+	)
+
+	expected := []FilterClause{
+		{Rule: "("},
+		{Rule: "A"},
+		{Rule: "AND"},
+		{Rule: "NOT"},
+		{Rule: "("},
+		{Left: "B", Operator: "=", Right: "foo", Rule: "WHERE"},
+		{Rule: ")"},
+		{Rule: "AND"},
+		{Rule: "("},
+		{Rule: "NOT"},
+		{Rule: "("},
+		{Left: "C.1", Operator: "=", Right: "bar", Rule: "WHERE"},
+		{Rule: ")"},
+		{Rule: "OR"},
+		{Rule: "C.2"},
+		{Rule: ")"},
+		{Rule: ")"},
+	}
+	if !slices.Equal(clauses, expected) {
+		t.Errorf("Expected '%+v', got '%+v'", expected, clauses)
+	}
+}
+
 func TestFilterOr(t *testing.T) {
 	clauses := Or(
 		FilterClause{Rule: "A"},
