@@ -2,6 +2,7 @@ package rem
 
 import (
 	"database/sql"
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -92,6 +93,92 @@ type testAccountsModelToMap struct {
 	Group    NullForeignKey[testGroupsModelToMap] `db:"group_id" db_on_delete:"SET NULL"`
 	Id       int64                                `db:"id" db_primary:"true"`
 	Name     string                               `db:"name"`
+}
+
+func TestModelToJsonMap(t *testing.T) {
+	model := Use[testAccountsModelToMap]()
+
+	rows := []testAccountsModelToMap{
+		{
+			Id:   1,
+			Name: "foo",
+			EditedAt: sql.NullTime{
+				Time:  time.Date(2009, time.January, 2, 3, 0, 0, 0, time.UTC),
+				Valid: true,
+			},
+			Group: NullForeignKey[testGroupsModelToMap]{
+				Row:   &testGroupsModelToMap{Id: 10},
+				Valid: true,
+			},
+		},
+		{
+			Id:   2,
+			Name: "bar",
+			Group: NullForeignKey[testGroupsModelToMap]{
+				Row:   &testGroupsModelToMap{Id: 20},
+				Valid: true,
+			},
+		},
+		{Id: 3, Name: "baz"},
+	}
+	expected := []map[string]interface{}{
+		{
+			"id":       int64(1),
+			"name":     "foo",
+			"editedat": time.Date(2009, time.January, 2, 3, 0, 0, 0, time.UTC),
+			"group":    rows[0].Group,
+		},
+		{
+			"id":       int64(2),
+			"name":     "bar",
+			"editedat": nil,
+			"group":    rows[1].Group,
+		},
+		{
+			"id":       int64(3),
+			"name":     "baz",
+			"editedat": nil,
+			"group":    rows[2].Group,
+		},
+	}
+	for i, row := range rows {
+		actual := model.ToJsonMap(&row)
+		if !maps.Equal(actual, expected[i]) {
+			t.Errorf("Expected '%#v', got '%#v'", expected[i], actual)
+		}
+	}
+
+	groupsModel := Use[testGroupsModelToMap]()
+	groups := []testGroupsModelToMap{
+		{
+			Id:   1,
+			Name: "foo",
+		},
+		{
+			Id:   2,
+			Name: "bar",
+		},
+	}
+	expected = []map[string]interface{}{
+		{
+			"accounts": OneToMany[testAccountsModelToMap]{},
+			"id":       int64(1),
+			"name":     "foo",
+		},
+		{
+			"accounts": OneToMany[testAccountsModelToMap]{},
+			"id":       int64(2),
+			"name":     "bar",
+		},
+	}
+	for i, row := range groups {
+		actual := groupsModel.ToJsonMap(&row)
+		actualString := fmt.Sprintf("%#v", actual)
+		expectedString := fmt.Sprintf("%#v", expected[i])
+		if actualString != expectedString {
+			t.Errorf("Expected '%s', got '%s'", expectedString, actualString)
+		}
+	}
 }
 
 func TestModelToMap(t *testing.T) {

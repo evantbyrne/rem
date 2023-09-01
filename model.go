@@ -280,6 +280,23 @@ func (model *Model[T]) TableDrop(db *sql.DB, tableDropConfig ...TableDropConfig)
 	return query.TableDrop(db, TableDropConfig{})
 }
 
+func (model *Model[T]) ToJsonMap(row *T) map[string]interface{} {
+	result := make(map[string]interface{}, 0)
+	value := reflect.ValueOf(row).Elem()
+	for _, field := range model.Fields {
+		fieldName := strings.ToLower(field.Name)
+		switch fv := value.FieldByName(field.Name).Interface().(type) {
+		case driver.Valuer:
+			result[fieldName], _ = fv.Value()
+
+		default:
+			result[fieldName] = fv
+		}
+	}
+
+	return result
+}
+
 func (model *Model[T]) ToMap(row *T) (map[string]interface{}, error) {
 	args := make(map[string]interface{})
 	value := reflect.ValueOf(*row)
