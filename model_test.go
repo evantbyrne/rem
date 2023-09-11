@@ -2,7 +2,6 @@ package rem
 
 import (
 	"database/sql"
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -95,6 +94,41 @@ type testAccountsModelToMap struct {
 	Name     string                               `db:"name"`
 }
 
+func assertMapDeepEquals(t *testing.T, actual map[string]interface{}, expected map[string]interface{}) {
+	actualKeys := maps.Keys(actual)
+	expectKeys := maps.Keys(expected)
+	sort.Strings(actualKeys)
+	sort.Strings(expectKeys)
+	if !slices.Equal(actualKeys, expectKeys) {
+		t.Errorf("Expected '%#v', got '%#v'", expected, actual)
+	}
+	for _, key := range actualKeys {
+		actualValue := actual[key]
+		expectValue := expected[key]
+
+		switch av := actualValue.(type) {
+		case []map[string]interface{}:
+			ev, ok := expectValue.([]map[string]interface{})
+			if !ok {
+				t.Errorf("Expected\n'%#v', got\n'%#v'", expected, actual)
+			}
+			for i := range av {
+				assertMapDeepEquals(t, av[i], ev[i])
+			}
+		case map[string]interface{}:
+			ev, ok := expectValue.(map[string]interface{})
+			if !ok {
+				t.Errorf("Expected\n'%#v', got\n'%#v'", expected, actual)
+			}
+			assertMapDeepEquals(t, av, ev)
+		default:
+			if av != expectValue {
+				t.Errorf("Expected '%#v', got '%#v'", expected, actual)
+			}
+		}
+	}
+}
+
 func TestModelToJsonMap(t *testing.T) {
 	model := Use[testAccountsModelToMap]()
 
@@ -126,26 +160,33 @@ func TestModelToJsonMap(t *testing.T) {
 			"id":       int64(1),
 			"name":     "foo",
 			"editedat": time.Date(2009, time.January, 2, 3, 0, 0, 0, time.UTC),
-			"group":    rows[0].Group,
+			"group": map[string]interface{}{
+				"accounts": []map[string]interface{}{},
+				"name":     "",
+				"id":       int64(10),
+			},
 		},
 		{
 			"id":       int64(2),
 			"name":     "bar",
 			"editedat": nil,
-			"group":    rows[1].Group,
+			"group": map[string]interface{}{
+				"accounts": []map[string]interface{}{},
+				"name":     "",
+				"id":       int64(20),
+			},
 		},
 		{
 			"id":       int64(3),
 			"name":     "baz",
 			"editedat": nil,
-			"group":    rows[2].Group,
+			"group":    nil,
 		},
 	}
+
 	for i, row := range rows {
 		actual := model.ToJsonMap(&row)
-		if !maps.Equal(actual, expected[i]) {
-			t.Errorf("Expected '%#v', got '%#v'", expected[i], actual)
-		}
+		assertMapDeepEquals(t, actual, expected[i])
 	}
 
 	groupsModel := Use[testGroupsModelToMap]()
@@ -161,23 +202,19 @@ func TestModelToJsonMap(t *testing.T) {
 	}
 	expected = []map[string]interface{}{
 		{
-			"accounts": OneToMany[testAccountsModelToMap]{},
+			"accounts": []map[string]interface{}{},
 			"id":       int64(1),
 			"name":     "foo",
 		},
 		{
-			"accounts": OneToMany[testAccountsModelToMap]{},
+			"accounts": []map[string]interface{}{},
 			"id":       int64(2),
 			"name":     "bar",
 		},
 	}
 	for i, row := range groups {
 		actual := groupsModel.ToJsonMap(&row)
-		actualString := fmt.Sprintf("%#v", actual)
-		expectedString := fmt.Sprintf("%#v", expected[i])
-		if actualString != expectedString {
-			t.Errorf("Expected '%s', got '%s'", expectedString, actualString)
-		}
+		assertMapDeepEquals(t, actual, expected[i])
 	}
 }
 

@@ -15,6 +15,15 @@ func (field *OneToMany[To]) All(db *sql.DB) ([]*To, error) {
 	return field.Query().Filter(field.RelatedColumn, "=", field.RowPk).All(db)
 }
 
+func (field OneToMany[To]) JsonValue() interface{} {
+	model := field.Model()
+	results := make([]map[string]interface{}, len(field.Rows))
+	for i := range field.Rows {
+		results[i] = model.ToJsonMap(field.Rows[i])
+	}
+	return results
+}
+
 func (field OneToMany[To]) MarshalJSON() ([]byte, error) {
 	model := field.Model()
 	results := make([]map[string]interface{}, len(field.Rows))
