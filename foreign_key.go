@@ -2,6 +2,7 @@ package rem
 
 import (
 	"database/sql"
+	"encoding/json"
 	"reflect"
 )
 
@@ -17,6 +18,20 @@ func (fk *ForeignKey[To]) Fetch(db *sql.DB) (*To, error) {
 	value := reflect.ValueOf(&fk.Row).Elem()
 	id := value.FieldByName(query.Model.PrimaryField).Interface()
 	return query.Filter("id", "=", id).First(db)
+}
+
+func (fk ForeignKey[To]) JsonValue() interface{} {
+	if !fk.Valid {
+		return nil
+	}
+	return fk.Model().ToJsonMap(fk.Row)
+}
+
+func (fk ForeignKey[To]) MarshalJSON() ([]byte, error) {
+	if !fk.Valid {
+		return json.Marshal(nil)
+	}
+	return json.Marshal(fk.Model().ToJsonMap(fk.Row))
 }
 
 func (fk *ForeignKey[To]) Model() *Model[To] {
@@ -45,6 +60,20 @@ func (fk *NullForeignKey[To]) Fetch(db *sql.DB) (*To, error) {
 	value := reflect.ValueOf(&fk.Row).Elem()
 	id := value.FieldByName(query.Model.PrimaryField).Interface()
 	return query.Filter("id", "=", id).First(db)
+}
+
+func (fk NullForeignKey[To]) JsonValue() interface{} {
+	if !fk.Valid {
+		return nil
+	}
+	return fk.Model().ToJsonMap(fk.Row)
+}
+
+func (fk NullForeignKey[To]) MarshalJSON() ([]byte, error) {
+	if !fk.Valid {
+		return json.Marshal(nil)
+	}
+	return json.Marshal(fk.Model().ToJsonMap(fk.Row))
 }
 
 func (fk *NullForeignKey[To]) Model() *Model[To] {

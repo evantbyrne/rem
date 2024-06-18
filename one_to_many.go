@@ -2,6 +2,7 @@ package rem
 
 import (
 	"database/sql"
+	"encoding/json"
 )
 
 type OneToMany[To any] struct {
@@ -12,6 +13,24 @@ type OneToMany[To any] struct {
 
 func (field *OneToMany[To]) All(db *sql.DB) ([]*To, error) {
 	return field.Query().Filter(field.RelatedColumn, "=", field.RowPk).All(db)
+}
+
+func (field OneToMany[To]) JsonValue() interface{} {
+	model := field.Model()
+	results := make([]map[string]interface{}, len(field.Rows))
+	for i := range field.Rows {
+		results[i] = model.ToJsonMap(field.Rows[i])
+	}
+	return results
+}
+
+func (field OneToMany[To]) MarshalJSON() ([]byte, error) {
+	model := field.Model()
+	results := make([]map[string]interface{}, len(field.Rows))
+	for i, row := range field.Rows {
+		results[i] = model.ToJsonMap(row)
+	}
+	return json.Marshal(results)
 }
 
 func (field *OneToMany[To]) Model() *Model[To] {

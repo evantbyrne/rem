@@ -25,6 +25,7 @@ var filterOperators = map[string]struct{}{
 	"<> ANY":     {},
 	"EXISTS":     {},
 	"NOT EXISTS": {},
+	"OVERLAPS":   {},
 	"?":          {},
 	"?&":         {},
 	"?|":         {},
@@ -101,6 +102,9 @@ func (filter FilterClause) StringWithArgs(dialect Dialect, args []interface{}) (
 	case "AND":
 		return " AND", args, nil
 
+	case "NOT":
+		return " NOT", args, nil
+
 	case "OR":
 		return " OR", args, nil
 
@@ -149,7 +153,7 @@ func And(clauses ...interface{}) []FilterClause {
 	indent := 0
 	filter := []FilterClause{{Rule: "("}}
 	for i, clause := range flat {
-		if i > 0 && indent == 0 {
+		if i > 0 && indent == 0 && flat[i-1].Rule != "NOT" {
 			filter = append(filter, FilterClause{Rule: "AND"})
 		}
 		if clause.Rule == "(" {
@@ -181,6 +185,15 @@ func flattenFilterClause(clauses []FilterClause, clause interface{}) []FilterCla
 	return clauses
 }
 
+func Not(column interface{}, operator string, value interface{}) []FilterClause {
+	return []FilterClause{
+		{Rule: "NOT"},
+		{Rule: "("},
+		Q(column, operator, value),
+		{Rule: ")"},
+	}
+}
+
 func NotExists(value interface{}) FilterClause {
 	return FilterClause{
 		Left:     "",
@@ -199,7 +212,7 @@ func Or(clauses ...interface{}) []FilterClause {
 	indent := 0
 	filter := []FilterClause{{Rule: "("}}
 	for i, clause := range flat {
-		if i > 0 && indent == 0 {
+		if i > 0 && indent == 0 && flat[i-1].Rule != "NOT" {
 			filter = append(filter, FilterClause{Rule: "OR"})
 		}
 		if clause.Rule == "(" {
